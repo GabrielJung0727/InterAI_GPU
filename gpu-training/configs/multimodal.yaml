@@ -1,0 +1,44 @@
+# Multimodal fusion skeleton (P4). Not trainable until aligned
+# speech + video + text interview data exists (see multimodal/dataset.py).
+base: base.yaml
+
+experiment:
+  name: multimodal_fusion
+  task: multimodal
+
+data:
+  processed_dir: data/processed/multimodal
+  usage_scope: research
+  task: regression
+  target_columns:
+    - label_answer_quality
+    - label_delivery_quality
+    - label_pace
+    - label_pause
+    - label_gaze
+    - label_movement
+  split:
+    val_ratio: 0.15
+    test_ratio: 0.15
+    group_column: group_id
+
+model:
+  name: multimodal_fusion
+  params:
+    fusion_dim: 256
+    num_layers: 2
+    num_heads: 4
+    dropout: 0.1
+    heads:                    # sizes must sum to len(target_columns)
+      answer_quality: 1
+      delivery_quality: 1
+      communication_metrics: 4
+
+training:
+  batch_size: 32
+  epochs: 30
+  lr: 0.0003
+
+checkpoint:
+  metric: val_mean_mae
+  mode: min

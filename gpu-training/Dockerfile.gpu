@@ -1,0 +1,51 @@
+# GPU training image.
+#
+# Build:  docker build -f Dockerfile.gpu -t interview-gpu-training .
+# Run:    docker run --rm --gpus all \
+#           -v "$PWD/data:/app/data" -v "$PWD/checkpoints:/app/checkpoints" \
+#           -v "$PWD/outputs:/app/outputs" -v "$PWD/models:/app/models" \
+#           interview-gpu-training python scripts/check_gpu.py
+#
+# Requires the NVIDIA Container Toolkit on the host. The host only needs an
+# NVIDIA driver new enough for CUDA 12.8 (>= 570); CUDA itself is not needed on
+# the host.
+#
+# Version alignment: the base image tag and the PyTorch wheel index in
+# pyproject.toml ([tool.uv.index] pytorch-cu128) must name the same CUDA
+# release. The cu128 wheels bundle their own CUDA/cuDNN runtime libraries, so
+# the slim "base" flavour of the CUDA image is sufficient.
+ARG CUDA_VERSION=12.8.1
+FROM nvidia/cuda:${CUDA_VERSION}-base-ubuntu24.04
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+
+# libgl1 / libglib2.0-0: OpenCV + MediaPipe; libsndfile1 / ffmpeg: audio and video decoding.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libsndfile1 ffmpeg git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV UV_PYTHON=3.12 \
+    UV_PYTHON_PREFERENCE=only-managed \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/app/.cache/huggingface \
+    PATH="/app/.venv/bin:${PATH}"
+
+WORKDIR /app
+
+# Dependencies first (cached layer), pinned by uv.lock.
+COPY pyproject.toml uv.lock .python-version README.md ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+COPY src ./src
+COPY scripts ./scripts
+COPY configs ./configs
+COPY tests ./tests
+RUN uv sync --frozen --no-dev \
+    && mkdir -p data/raw data/interim data/processed checkpoints outputs models/mediapipe
+
+# Datasets, checkpoints and outputs are mounted at run time, never baked in.
+VOLUME ["/app/data", "/app/checkpoints", "/app/outputs", "/app/models"]
+
+CMD ["python", "scripts/check_gpu.py"]

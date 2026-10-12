@@ -1,0 +1,55 @@
+# Interview answer evaluator: shared text encoder -> one head per rubric dimension.
+base: base.yaml
+
+experiment:
+  name: answer_evaluator
+  task: answer
+
+data:
+  processed_dir: data/processed/answer
+  usage_scope: research
+  task: regression
+  target_columns:
+    - label_relevance
+    - label_structure
+    - label_specificity
+    - label_evidence
+    - label_technical_depth
+    - label_ownership
+    - label_logical_consistency
+  split:
+    val_ratio: 0.1
+    test_ratio: 0.1
+    group_column: group_id
+  params:
+    max_length: 512
+    input_style: e5           # e5 (query:/passage: prefixes) | plain (BGE-M3 etc.)
+
+model:
+  name: answer_evaluator
+  params:
+    encoder_name: intfloat/multilingual-e5-small   # or intfloat/multilingual-e5-base, BAAI/bge-m3
+    head_hidden_dim: 256
+    dropout: 0.1
+    encoder_lr_scale: 0.2     # encoder lr = lr * scale; heads use lr
+    freeze_encoder: false
+    # trainable_layers: 4     # fine-tune only the top N encoder layers
+    gradient_checkpointing: false
+    lora:                     # Stage C; needs `uv sync --extra lora`
+      enabled: false
+      r: 8
+      alpha: 16
+      dropout: 0.05
+      target_modules: [query, value]
+
+training:
+  batch_size: 16
+  epochs: 10
+  lr: 0.0001
+  gradient_accumulation_steps: 2
+  warmup_ratio: 0.1
+  early_stopping_patience: 3
+
+checkpoint:
+  metric: val_mean_mae
+  mode: min

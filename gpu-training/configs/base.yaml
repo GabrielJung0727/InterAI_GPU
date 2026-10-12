@@ -1,0 +1,44 @@
+# Shared defaults. Task configs inherit from this file via `base: base.yaml`
+# and override what they need. Paths are relative to gpu-training/.
+
+experiment:
+  seed: 42
+  deterministic: false        # true = deterministic cuDNN/algorithms (slower)
+  output_dir: outputs
+  checkpoint_dir: checkpoints
+
+training:
+  batch_size: 32
+  epochs: 20
+  lr: 0.0001
+  weight_decay: 0.01
+  gradient_accumulation_steps: 1
+  mixed_precision: auto       # auto | bf16 | fp16 | fp32
+  grad_clip_norm: 1.0
+  scheduler: cosine           # none | cosine | linear
+  warmup_ratio: 0.05
+  loss: huber                 # regression loss: huber | mse | l1
+  early_stopping_patience: 5  # 0 disables early stopping
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+  compile: false              # torch.compile
+  log_every: 50
+  imbalance:                  # classification only; all off by default
+    class_weights: false
+    weighted_sampler: false
+    focal_loss: false
+    focal_gamma: 2.0
+
+device:
+  type: auto                  # auto (CUDA > MPS > CPU) | cuda | cuda:N | mps | cpu
+
+checkpoint:
+  save_best_only: true
+  metric: val_loss
+  mode: min
+
+logging:
+  wandb: false                # optional; training never requires W&B
+  wandb_project: interview-gpu-training

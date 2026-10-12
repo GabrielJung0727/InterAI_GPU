@@ -1,0 +1,41 @@
+# Video behaviour model: MediaPipe landmark sequences [T, F] -> temporal model.
+base: base.yaml
+
+experiment:
+  name: video_temporal
+  task: video
+
+data:
+  processed_dir: data/processed/video
+  usage_scope: research
+  task: regression
+  # Behaviour-based targets only (never personality / honesty / hiring fit).
+  # Default matches the MIT Interview dataset ratings.
+  target_columns:
+    camera_engagement: label_EyeContact
+    visual_focus: label_Focused
+  split:
+    val_ratio: 0.15
+    test_ratio: 0.15
+    group_column: group_id
+  params:
+    max_frames: 600           # 2 minutes at 5 fps
+
+model:
+  name: video_temporal
+  params:
+    backbone: transformer     # gru | lstm | tcn | transformer
+    hidden_dim: 128
+    num_layers: 2
+    num_heads: 4              # transformer only
+    dropout: 0.1
+
+training:
+  batch_size: 16
+  epochs: 40
+  lr: 0.0003
+  early_stopping_patience: 8
+
+checkpoint:
+  metric: val_mean_mae
+  mode: min

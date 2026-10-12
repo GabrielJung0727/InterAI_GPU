@@ -1,0 +1,48 @@
+# Speech behaviour model (Stage 1: handcrafted features -> MLP).
+base: base.yaml
+
+experiment:
+  name: speech_baseline
+  task: speech
+
+data:
+  processed_dir: data/processed/speech
+  usage_scope: research       # production refuses research-only datasets
+  task: regression
+  # output_name: label column in data/processed/speech/features.parquet.
+  # This default matches the behaviour ratings of the MIT Interview dataset
+  # (scripts/prepare_speech.py --dataset mit_interview). Other datasets need
+  # their own delivery labels: the trainer lists the available label columns
+  # if these are missing. No psychological-state targets (confidence, anxiety).
+  target_columns:
+    pace_score: label_SpeakingRate
+    pause_score: label_Paused
+    filler_score: label_NoFillers
+    delivery_engagement: label_EngagingTone
+  split:
+    val_ratio: 0.15
+    test_ratio: 0.15
+    group_column: group_id    # speaker / candidate / session
+  params:
+    input: handcrafted        # handcrafted | embedding | both | waveform
+    # max_seconds: 20         # waveform mode only
+
+model:
+  name: speech_mlp            # speech_mlp | speech_encoder_finetune
+  params:
+    hidden_dims: [128, 64]
+    dropout: 0.1
+    # Stage 3 (name: speech_encoder_finetune, data.params.input: waveform):
+    # encoder_name: microsoft/wavlm-base-plus
+    # trainable_layers: 2
+    # encoder_lr_scale: 0.1
+
+training:
+  batch_size: 32
+  epochs: 50
+  lr: 0.001
+  early_stopping_patience: 8
+
+checkpoint:
+  metric: val_mean_mae
+  mode: min

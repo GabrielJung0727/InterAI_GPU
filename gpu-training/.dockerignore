@@ -1,0 +1,15 @@
+.venv
+.git
+**/__pycache__
+.pytest_cache
+.ruff_cache
+data/raw
+data/interim
+data/processed
+checkpoints
+outputs
+models
+wandb
+notebooks
+.env
+.env.*
