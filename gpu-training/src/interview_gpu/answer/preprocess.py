@@ -19,10 +19,13 @@ ANSWERS_FILE = "answers.jsonl"
 def load_external_labels(path: str | Path) -> dict[str, dict[str, float]]:
     """Read Stage-A labels: JSONL lines of ``{"sample_id": ..., "scores": {...}}``.
 
+    Lines with ``"needs_review": true`` are skipped.
+
     Raises:
         InvalidLabelError: A line is malformed or holds invalid scores.
     """
     labels: dict[str, dict[str, float]] = {}
+    flagged = 0
     with Path(path).open("r", encoding="utf-8-sig") as handle:
         for number, line in enumerate(handle, start=1):
             if not line.strip():
@@ -30,10 +33,17 @@ def load_external_labels(path: str | Path) -> dict[str, dict[str, float]]:
             try:
                 record = json.loads(line)
                 sample_id = str(record["sample_id"])
-                scores = record["scores"]
-            except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                scores = dict(record["scores"])
+            except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
                 raise InvalidLabelError(f"{path}:{number} must be {{'sample_id': ..., 'scores': {{...}}}}") from exc
+            if record.get("needs_review"):  # unstable judge scores stay out of training
+                flagged += 1
+                continue
+            # null = dimension not applicable to the question: left unlabeled, masked in the loss.
+            scores = {name: value for name, value in scores.items() if value is not None}
             labels[sample_id] = validate_scores(scores, sample_id)
+    if flagged:
+        get_logger().info("Ignored %d labels marked needs_review in %s", flagged, path)
     return labels
 
 

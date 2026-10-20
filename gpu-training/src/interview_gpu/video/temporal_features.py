@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from interview_gpu.common.io import read_table, write_table
 from interview_gpu.schemas.video import VIDEO_FEATURE_COLUMNS, VIDEO_MODEL_FEATURES
 from interview_gpu.video.landmarks import (
     LEFT_ELBOW,
@@ -99,11 +100,11 @@ def summarize_table(table: pd.DataFrame) -> dict[str, float | None]:
 
 
 def save_feature_table(table: pd.DataFrame, path: str | Path) -> None:
-    """Save a feature table as ``.npy`` (``[T, len(VIDEO_FEATURE_COLUMNS)]``) or ``.parquet``."""
+    """Save a feature table as ``.npy`` (``[T, len(VIDEO_FEATURE_COLUMNS)]``) or ``.csv``."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    if path.suffix == ".parquet":
-        table.to_parquet(path, index=False)
+    if path.suffix == ".csv":
+        write_table(path, table)
     else:
         np.save(path, table[list(VIDEO_FEATURE_COLUMNS)].to_numpy(dtype=np.float32))
 
@@ -111,6 +112,6 @@ def save_feature_table(table: pd.DataFrame, path: str | Path) -> None:
 def load_feature_table(path: str | Path) -> pd.DataFrame:
     """Inverse of :func:`save_feature_table`."""
     path = Path(path)
-    if path.suffix == ".parquet":
-        return pd.read_parquet(path)
+    if path.suffix == ".csv":
+        return read_table(path)
     return pd.DataFrame(np.load(path), columns=list(VIDEO_FEATURE_COLUMNS))

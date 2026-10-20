@@ -9,7 +9,7 @@ data:
   processed_dir: data/processed/speech
   usage_scope: research       # production refuses research-only datasets
   task: regression
-  # output_name: label column in data/processed/speech/features.parquet.
+  # output_name: label column in data/processed/speech/features.csv.
   # This default matches the behaviour ratings of the MIT Interview dataset
   # (scripts/prepare_speech.py --dataset mit_interview). Other datasets need
   # their own delivery labels: the trainer lists the available label columns

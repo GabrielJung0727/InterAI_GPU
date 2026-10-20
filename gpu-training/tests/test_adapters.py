@@ -6,10 +6,8 @@ import json
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
-from conftest import needs_parquet
 from interview_gpu.answer.preprocess import prepare_answer_dataset
 from interview_gpu.common.errors import (
     ConfigError,
@@ -18,6 +16,7 @@ from interview_gpu.common.errors import (
     InvalidLabelError,
     UsageScopeError,
 )
+from interview_gpu.common.io import read_table
 from interview_gpu.datasets import ADAPTERS, ensure_scope_allowed, get_adapter
 from interview_gpu.datasets.inspection import inspect_dataset
 from interview_gpu.datasets.internal import load_before_after
@@ -94,16 +93,16 @@ def test_internal_adapter_requires_consent(internal_dir: Path) -> None:
     before = next(s for s in samples if s.sample_id == "pair_1_before")
     after = next(s for s in samples if s.sample_id == "pair_1_after")
     assert before.group_id == after.group_id  # a pair never straddles train/test
-    assert before.metadata["deltas"]["delta_specificity"] == 4.0
+    assert before.metadata["deltas"]["delta_specificity"] == 2.0
 
 
 def test_before_after_deltas(internal_dir: Path) -> None:
     pairs = load_before_after(internal_dir)
     assert len(pairs) == 6
     deltas = pairs[0].deltas()
-    assert deltas["delta_relevance"] == 2.0 and deltas["delta_specificity"] == 4.0
+    assert deltas["delta_relevance"] == 1.0 and deltas["delta_specificity"] == 2.0
     assert deltas["delta_structure"] is None  # not scored -> not fabricated
-    assert deltas["overall_delta"] == 3.0
+    assert deltas["overall_delta"] == 1.5
     empty = BeforeAfterSample(pair_id="p", question="q", before_answer="a", after_answer="b")
     assert empty.deltas()["overall_delta"] is None
 
@@ -156,12 +155,11 @@ def test_inspect_dataset_durations(mit_interview_dir: Path) -> None:
     assert report["label_distribution"]["EyeContact"]["count"] == 12
 
 
-@needs_parquet
 def test_prepare_speech_dataset(mit_interview_dir: Path, tmp_path: Path) -> None:
     (mit_interview_dir / "Audio" / "P1.wav").write_bytes(b"broken")
     adapter = get_adapter("mit_interview", mit_interview_dir)
     manifest = prepare_speech_dataset(adapter, tmp_path / "speech")
-    frame = pd.read_parquet(tmp_path / "speech" / "features.parquet")
+    frame = read_table(tmp_path / "speech" / "features.csv")
     assert len(frame) == 11 and manifest["num_samples"] == 11
     assert manifest["skipped_records"]["corrupted_audio"] == 1
     assert manifest["usage_scope"] == "research" and manifest["license"]["research_only"] is True
@@ -191,7 +189,7 @@ def test_prepare_answer_merges_and_validates_external_labels(aihub_interview_dir
     assert len(exported) == 2 and "relevance" in exported[0]["prompt"]
 
     labels = tmp_path / "labels.jsonl"
-    labels.write_text(json.dumps({"sample_id": exported[0]["sample_id"], "scores": {"relevance": 8}}) + "\n")
+    labels.write_text(json.dumps({"sample_id": exported[0]["sample_id"], "scores": {"relevance": 3}}) + "\n")
     assert prepare_answer_dataset(adapter, tmp_path / "a2", labels_path=labels)["num_labeled"] == 1
 
     labels.write_text(json.dumps({"sample_id": "x", "scores": {"relevance": 42}}) + "\n")

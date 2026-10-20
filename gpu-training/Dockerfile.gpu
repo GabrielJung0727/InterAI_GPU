@@ -36,13 +36,13 @@ WORKDIR /app
 
 # Dependencies first (cached layer), pinned by uv.lock.
 COPY pyproject.toml uv.lock .python-version README.md ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --extra labeling --no-install-project
 
 COPY src ./src
 COPY scripts ./scripts
 COPY configs ./configs
 COPY tests ./tests
-RUN uv sync --frozen --no-dev \
+RUN uv sync --frozen --no-dev --extra labeling \
     && mkdir -p data/raw data/interim data/processed checkpoints outputs models/mediapipe
 
 # Datasets, checkpoints and outputs are mounted at run time, never baked in.

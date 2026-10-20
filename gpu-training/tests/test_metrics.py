@@ -103,8 +103,8 @@ def test_to_jsonable_handles_numpy_and_nan() -> None:
 
 
 def test_answer_score_validation() -> None:
-    assert validate_scores({"relevance": 8, "structure": "6.5"}) == {"relevance": 8.0, "structure": 6.5}
-    for bad in ({"relevance": 11}, {"relevance": -1}, {"charisma": 5}, {"relevance": "high"}):
+    assert validate_scores({"relevance": 3, "structure": "2.5"}) == {"relevance": 3.0, "structure": 2.5}
+    for bad in ({"relevance": 5}, {"relevance": -1}, {"charisma": 5}, {"relevance": "high"}):
         with pytest.raises(InvalidLabelError):
             validate_scores(bad)
 
@@ -117,8 +117,8 @@ def test_answer_prompts() -> None:
 
     prompt = build_labeling_prompt("질문?", "답변.")
     assert all(dimension in prompt for dimension in ANSWER_DIMENSIONS)
-    response = 'Here you go:\n{"relevance": 8, "structure": 6}'
-    assert parse_labeling_response(response) == {"relevance": 8.0, "structure": 6.0}
+    response = 'Here you go:\n{"relevance": 3, "structure": 2}'
+    assert parse_labeling_response(response) == {"relevance": 3.0, "structure": 2.0}
     with pytest.raises(InvalidLabelError):
         parse_labeling_response("no json here")
     with pytest.raises(InvalidLabelError):

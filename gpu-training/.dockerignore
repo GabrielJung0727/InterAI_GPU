@@ -6,6 +6,7 @@
 data/raw
 data/interim
 data/processed
+data/labeled
 checkpoints
 outputs
 models

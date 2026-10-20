@@ -20,6 +20,7 @@ from torch.utils.data import Dataset
 
 from interview_gpu.common.config import Config, resolve_path
 from interview_gpu.common.errors import ConfigError, InvalidLabelError
+from interview_gpu.common.io import read_table
 from interview_gpu.common.normalization import apply_normalizer, fit_normalizer
 from interview_gpu.common.runner import DataBundle, load_manifest
 from interview_gpu.common.tasks import Supervision, prepare_supervision
@@ -27,7 +28,7 @@ from interview_gpu.datasets.processed import require_processed
 from interview_gpu.schemas.speech import SPEECH_FEATURE_NAMES
 from interview_gpu.speech.features import load_audio
 
-FEATURES_FILE = "features.parquet"
+FEATURES_FILE = "features.csv"
 PREPARE_COMMAND = "python scripts/prepare_speech.py --input <raw dataset dir> --output data/processed/speech"
 INPUT_MODES = ("handcrafted", "embedding", "both", "waveform")
 
@@ -126,7 +127,7 @@ def collate_waveforms(batch: list[dict[str, Any]]) -> dict[str, Any]:
 def build_speech_data(cfg: Config) -> DataBundle:
     """Load processed speech data and build train/val/test datasets."""
     processed_dir = resolve_path(cfg.data.processed_dir)
-    frame = pd.read_parquet(require_processed(processed_dir / FEATURES_FILE, PREPARE_COMMAND))
+    frame = read_table(require_processed(processed_dir / FEATURES_FILE, PREPARE_COMMAND))
     manifest = load_manifest(processed_dir)
     mode = cfg.data.params.get("input", "handcrafted")
     if mode not in INPUT_MODES:

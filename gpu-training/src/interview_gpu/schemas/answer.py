@@ -19,7 +19,9 @@ ANSWER_DIMENSIONS: tuple[str, ...] = (
     "logical_consistency",
 )
 
-SCORE_MIN, SCORE_MAX = 0.0, 10.0
+#: Ordinal rubric scale: 0 매우 부족 · 1 부족 · 2 보통 · 3 좋음 · 4 매우 좋음.
+#: The service converts to a 100-point scale if it needs one.
+SCORE_MIN, SCORE_MAX = 0.0, 4.0
 
 
 class AnswerContext(BaseModel):
@@ -45,13 +47,14 @@ class AnswerTrainingExample(BaseModel):
     question: str
     answer: str
     context: AnswerContext = Field(default_factory=AnswerContext)
-    #: Subset of ``ANSWER_DIMENSIONS`` -> score in [0, 10]. May be empty (unlabeled).
+    #: Subset of ``ANSWER_DIMENSIONS`` -> score in [0, 4]. A dimension that does not
+    #: apply to the question is absent. May be empty (unlabeled).
     scores: dict[str, float] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 def validate_scores(scores: dict[str, Any], sample_id: str = "?") -> dict[str, float]:
-    """Check rubric scores: known dimensions, numeric, within ``[0, 10]``.
+    """Check rubric scores: known dimensions, numeric, within ``[0, 4]``.
 
     Raises:
         InvalidLabelError: On an unknown dimension or an out-of-range value.

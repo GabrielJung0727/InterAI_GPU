@@ -17,8 +17,8 @@ data/
     internal/                       08 service data (*.jsonl, opt-in only)
   interim/                          scratch space for manual conversions
   processed/                        written by scripts/prepare_*.py
-    speech/   features.parquet, embeddings/*.npy, manifest.json
-    video/    index.parquet, sequences/*.npy, manifest.json
+    speech/   features.csv, embeddings/*.npy, manifest.json
+    video/    index.csv, sequences/*.npy, manifest.json
     answer/   answers.jsonl, manifest.json
     multimodal/                     (future) aligned embeddings
 ```

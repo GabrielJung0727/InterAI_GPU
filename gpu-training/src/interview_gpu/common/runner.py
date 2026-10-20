@@ -28,7 +28,7 @@ from interview_gpu.common.device import (
     select_device,
 )
 from interview_gpu.common.errors import CheckpointMismatchError, EmptyDatasetError, UsageScopeError
-from interview_gpu.common.io import read_json, write_json
+from interview_gpu.common.io import read_json, write_json, write_table
 from interview_gpu.common.logging import setup_logging
 from interview_gpu.common.seed import make_generator, seed_everything, seed_worker
 from interview_gpu.common.tasks import (
@@ -118,7 +118,7 @@ def _write_eval_outputs(directory: Path, task: TaskSpec, result: EvalResult) -> 
     calibration, predictions = summarize_predictions(
         task, result.outputs, result.targets, result.mask, result.sample_ids
     )
-    predictions.to_parquet(directory / "predictions.parquet", index=False)
+    write_table(directory / "predictions.csv", predictions)
     if task.kind == "classification":
         _plot_confusion_matrix(directory / "confusion_matrix.png", task, predictions)
     return {"loss": result.loss, **result.metrics, **calibration}

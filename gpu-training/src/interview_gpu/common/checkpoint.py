@@ -106,7 +106,7 @@ def save_checkpoint(
             "dataset_metadata": dataset_metadata or {},
             "training_timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "git_commit": git_commit_hash(),
-            "pytorch_version": torch.__version__,
+            "pytorch_version": str(torch.__version__),  # TorchVersion is rejected by weights_only loading
         }
     )
     payload = {

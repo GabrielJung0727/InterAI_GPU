@@ -4,7 +4,7 @@ Expected layout — to be produced by a future alignment step once aligned
 audio + video + text interview data exists::
 
     data/processed/multimodal/
-        index.parquet    sample_id, group_id, speech_path, video_path, text_path, label_*
+        index.csv        sample_id, group_id, speech_path, video_path, text_path, label_*
         <modality>/<id>.npy     pooled embedding per modality (path may be null)
         manifest.json           must contain "embedding_dims": {"speech": .., "video": .., "text": ..}
 
@@ -18,18 +18,18 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
 from interview_gpu.common.config import Config, resolve_path
 from interview_gpu.common.errors import ConfigError
+from interview_gpu.common.io import read_table
 from interview_gpu.common.runner import DataBundle, load_manifest
 from interview_gpu.common.tasks import Supervision, prepare_supervision
 from interview_gpu.datasets.processed import require_processed
 from interview_gpu.multimodal.model import MODALITIES
 
-INDEX_FILE = "index.parquet"
+INDEX_FILE = "index.csv"
 PREPARE_HINT = "(no preprocessing script yet: aligned multimodal interview data is required first)"
 
 
@@ -67,7 +67,7 @@ class MultimodalEmbeddingDataset(Dataset):
 def build_multimodal_data(cfg: Config) -> DataBundle:
     """Load processed multimodal embeddings and build train/val/test datasets."""
     processed_dir = resolve_path(cfg.data.processed_dir)
-    frame = pd.read_parquet(require_processed(processed_dir / INDEX_FILE, PREPARE_HINT))
+    frame = read_table(require_processed(processed_dir / INDEX_FILE, PREPARE_HINT))
     manifest = load_manifest(processed_dir)
     input_dims = manifest.get("embedding_dims")
     if not isinstance(input_dims, dict) or set(input_dims) != set(MODALITIES):

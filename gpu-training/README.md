@@ -57,7 +57,7 @@ uv sync --extra wandb      # (선택) Weights & Biases
 
 이후 명령은 `uv run python scripts/...` 또는 `.venv` 활성화 후 `python scripts/...`로 실행합니다.
 
-pip을 쓰는 경우: `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128` 후 `pip install -e .`
+pip을 쓰는 경우: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128` 후 `pip install -e .`
 
 ## 3. Python version
 
@@ -142,12 +142,12 @@ python scripts/inspect_dataset.py --dataset aihub_interview --path /path/to/data
 ## 8. Preprocessing (CPU)
 
 ```bash
-# Speech: handcrafted feature → data/processed/speech/features.parquet
+# Speech: handcrafted feature → data/processed/speech/features.csv
 python scripts/prepare_speech.py --input /path/to/raw --output data/processed/speech --dataset aihub_interview
 #   Stage 2 (frozen encoder embedding, GPU 권장)
 python scripts/prepare_speech.py --input ... --dataset mit_interview --encoder microsoft/wavlm-base-plus
 
-# Video: MediaPipe landmark → data/processed/video/sequences/*.npy + index.parquet
+# Video: MediaPipe landmark → data/processed/video/sequences/*.npy + index.csv
 python scripts/prepare_video.py --input /path/to/video --output data/processed/video --dataset mit_interview --fps 5
 
 # Answer: 질문/답변 → data/processed/answer/answers.jsonl
@@ -201,18 +201,45 @@ python scripts/train_answer.py --config configs/answer.yaml
 ```
 
 Shared encoder(기본 `intfloat/multilingual-e5-small`) + rubric 항목별 head
-(`relevance, structure, specificity, evidence, technical_depth, ownership, logical_consistency`, 0–10점).
+(`relevance, structure, specificity, evidence, technical_depth, ownership, logical_consistency`, 0–4점: 0 매우 부족 · 2 보통 · 4 매우 좋음).
 라벨이 일부만 있는 샘플은 mask로 처리됩니다.
 
 | Stage | 방법 |
 |---|---|
-| A. 라벨 생성/검증 | `prepare_answer.py --export-prompts prompts.jsonl` → 외부 LLM judge 채점 → `--labels labels.jsonl`로 병합 (범위·항목 검증). **LLM API 호출은 이 프로젝트에 없습니다.** |
+| A. 라벨 생성/검증 | `label_answers.py`로 **로컬 LLM judge**(기본 `Qwen/Qwen3-8B`)가 채점 → `prepare_answer.py --labels`로 병합 (범위·항목 검증). **외부 LLM API 호출은 이 프로젝트에 없습니다.** 아래 "Stage A 로컬 채점" 참고 |
 | B. encoder baseline | 기본 설정. `model.params.encoder_name`을 `multilingual-e5-base`, `BAAI/bge-m3`(+`input_style: plain`) 등으로 교체 |
 | C. LoRA | `uv sync --extra lora` 후 `--set model.params.lora.enabled=true` |
 | D. custom evaluator | 자체 Before→After 데이터가 충분히 쌓인 뒤 |
 
 > AI Hub 채용면접 데이터에는 rubric 점수가 없습니다. Stage A 라벨이 준비되기 전에는
 > `No labeled samples` 오류로 학습이 중단되는 것이 정상입니다.
+
+**Stage A 로컬 채점** (`scripts/label_answers.py`, 설정 `configs/labeling.yaml`, 4bit/8bit 로딩은 `uv sync --extra labeling`)
+
+```bash
+python scripts/label_answers.py --dry-run                           # 200개 → data/labeled/dry_run/ (사람 검수용)
+python scripts/label_answers.py --limit 2000 --consistency-runs 2   # rubric 확정 후 검증용 2,000개
+python scripts/label_answers.py --full --consistency-runs 2         # 전체. --full 없이는 전체가 실행되지 않음
+python scripts/prepare_answer.py --labels data/labeled/qwen3_answers.jsonl
+```
+
+* **Rubric V2** (`src/interview_gpu/answer/prompts.py`): 점수는 0~4 정수(0 매우 부족 · 2 보통 · 4 매우 좋음)입니다.
+  judge가 먼저 질문 유형(`question_type`, 10종)을 분류하고 항목별 평가 대상 여부(`applicability`)를 정합니다.
+  `technical_depth`는 기술·직무 지식을 묻는 질문에서만, `ownership`은 본인 경험을 묻는 질문에서만 채점하며,
+  평가 대상이 아닌 항목은 0이 아니라 `null`입니다. `null`은 `--labels` 병합 때 라벨 없음으로 처리되어 loss에서 mask됩니다.
+* 출력 레코드: `question_type`, `applicability`, `scores`, `score_evidence`(항목별 인용), `missing_points`,
+  `judge_confidence`(HIGH/MEDIUM/LOW), `needs_review`, `review_reason`.
+* 출력 JSONL이 곧 checkpoint입니다. 중단 후 같은 명령을 다시 실행하면 이미 채점한 `sample_id`는 건너뜁니다.
+  샘플 순서는 seed로 고정되어 200개 ⊂ 2,000개 ⊂ 전체입니다.
+* 함께 생성되는 파일: `.review.csv`(질문·답변·점수·근거), `.stats.json`(점수 분포·null 비율·질문 유형 분포·
+  Pearson/Spearman 상관·`needs_review` 비율·confidence 분포·JSON 파싱 실패율), `.failed_samples.jsonl`, `.meta.json`.
+* `needs_review=true`가 되는 경우: `judge_confidence`가 LOW, `--consistency-runs 2`의 두 채점이 한 항목에서 2점 이상 차이,
+  두 채점이 평가 대상 여부를 다르게 판단. 라벨은 첫 번째(greedy) 채점 값이며, `needs_review` 라벨은 `--labels` 병합에서 제외됩니다.
+* backend·모델·rubric 프롬프트·채점 설정이 바뀌면 기존 출력에 이어 쓰기를 거부합니다. rubric을 고쳤다면 `--output`을 바꾸세요.
+* 두 채점 결과 비교(예: rubric V1 vs V2): `python scripts/compare_labels.py --old <v1.jsonl> --old-scale 10 --new <v2.jsonl>`
+* **Backend**: 기본은 `transformers`(Windows·Linux). 16GB VRAM에서는 Qwen3-8B가 자동으로 4bit 로딩됩니다.
+  `--backend vllm`은 Linux/WSL2 전용 선택 사항이며(`pip install vllm`), Windows에서는 자동으로 transformers를 씁니다.
+  16GB VRAM에서 vLLM을 쓰려면 `--vllm-model`로 사전 양자화 모델을 지정하세요. 24GB 이상이면 `--model Qwen/Qwen3-14B`를 권장합니다.
 
 **Before → After 데이터**: `internal` adapter가 `before_answer/feedback/after_answer/before_scores/after_scores`를 읽어
 before·after 두 샘플로 펼치고(같은 group에 묶어 split 누수 방지), `BeforeAfterSample.deltas()`로
@@ -237,7 +264,7 @@ checkpoints/<task>/<task>_v001/
                   label mapping, normalization, dataset metadata, timestamp, git commit
   config.yaml     metrics.json     metadata.json
 outputs/<experiment>/
-  train.log  metrics.json  history.csv  config.yaml  loss_curve.png  predictions.parquet  (confusion_matrix.png)
+  train.log  metrics.json  history.csv  config.yaml  loss_curve.png  predictions.csv  (confusion_matrix.png)
 ```
 
 학습할 때마다 새 버전 폴더가 생깁니다. `checkpoint.metric`(예: `val_loss`, `val_mean_mae`, `val_macro_f1`) 기준 best만 저장하며,
@@ -264,7 +291,7 @@ VideoBehaviorModel("checkpoints/video/video_v001").predict("answer.mp4")   # 또
 # {"metrics": {"gaze_center_ratio": 0.61, "head_yaw_std": ..., ...}, "scores": {...}, "model_version": "video_v001"}
 
 AnswerEvaluator("checkpoints/answer/answer_v001").predict(question="...", answer="...", job="Backend Engineer")
-# {"scores": {"relevance": 8.2, "structure": 6.9, ...}, "model_version": "answer_v001"}
+# {"scores": {"relevance": 3.2, "structure": 2.6, ...}, "model_version": "answer_v001"}
 ```
 
 `SpeechAnalyzer()` / `VideoBehaviorModel()`는 checkpoint 없이도 raw metric(근거 데이터)을 반환합니다.
@@ -273,7 +300,7 @@ AnswerEvaluator("checkpoints/answer/answer_v001").predict(question="...", answer
 
 | 증상 | 원인 / 해결 |
 |---|---|
-| `OSError: [WinError 4551] 애플리케이션 제어 정책에서 이 파일을 차단했습니다` (torch, pyarrow import) | Windows **Smart App Control / WDAC**가 서명되지 않은 DLL을 차단. 코드 문제가 아님. ① Docker/WSL2(Linux)에서 실행 ② 다른 학습용 머신 사용 ③ Windows 보안 → 앱 및 브라우저 컨트롤 → 스마트 앱 컨트롤 끄기(**되돌리려면 Windows 초기화 필요** — 신중히 결정) |
+| `OSError: [WinError 4551] 애플리케이션 제어 정책에서 이 파일을 차단했습니다` (torch import) | Windows **Smart App Control / WDAC**가 서명되지 않은 DLL을 차단. 코드 문제가 아님. ① Docker/WSL2(Linux)에서 실행 ② 다른 학습용 머신 사용 ③ Windows 보안 → 앱 및 브라우저 컨트롤 → 스마트 앱 컨트롤 끄기(**되돌리려면 Windows 초기화 필요** — 신중히 결정) |
 | `CUDA Available: False` | 드라이버 570 미만이거나 CPU용 torch 설치됨. `nvidia-smi` 확인 후 `uv sync` 재실행 |
 | `Device 'cuda' was requested but CUDA is not available` | 명시적 `--device cuda`는 CPU로 조용히 넘어가지 않음. `check_gpu.py`로 진단 |
 | `Dataset not found` | `data/raw/<폴더>` 배치 또는 `prepare_*.py` 미실행 |
@@ -323,4 +350,4 @@ docker run --rm --gpus all \
 uv run pytest
 ```
 
-CPU에서 대부분 실행되며 CUDA 전용 테스트는 GPU가 없으면 skip됩니다. PyTorch나 pyarrow를 로드할 수 없는 환경에서는 해당 테스트가 사유와 함께 skip됩니다.
+CPU에서 대부분 실행되며 CUDA 전용 테스트는 GPU가 없으면 skip됩니다. PyTorch를 로드할 수 없는 환경에서는 해당 테스트가 사유와 함께 skip됩니다.

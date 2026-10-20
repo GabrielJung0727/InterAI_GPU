@@ -7,7 +7,6 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
     "torch>=2.7",
     "torchvision",
-    "torchaudio",
     "transformers>=4.44",
     "accelerate>=0.33",
     "datasets>=2.20",
@@ -15,7 +14,6 @@ dependencies = [
     "numpy>=1.26",
     "pandas>=2.1",
     "scipy>=1.11",
-    "pyarrow>=15",
     "librosa>=0.10.2",
     "soundfile>=0.12",
     "mediapipe>=0.10.14",
@@ -27,6 +25,8 @@ dependencies = [
 [project.optional-dependencies]
 # LoRA fine-tuning of the answer encoder (Stage C).
 lora = ["peft>=0.11"]
+# 4-bit / 8-bit loading of the local Stage-A judge (scripts/label_answers.py).
+labeling = ["bitsandbytes>=0.45; sys_platform != 'darwin'"]
 # Optional experiment tracking. Training never requires it.
 wandb = ["wandb"]
 # Optional feature extractors / backbones.
@@ -52,7 +52,6 @@ explicit = true
 [tool.uv.sources]
 torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" }]
 torchvision = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" }]
-torchaudio = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" }]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

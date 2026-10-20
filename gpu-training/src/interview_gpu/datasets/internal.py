@@ -12,7 +12,7 @@ Single answer::
     {"sample_id": "...", "candidate_id": "...", "question": "...", "answer": "...",
      "company": "...", "position": "...", "interview_type": "technical",
      "audio_path": "...", "video_path": "...",
-     "scores": {"relevance": 8, ...},
+     "scores": {"relevance": 3, ...},
      "speech_metrics": {...}, "video_metrics": {...}, "answer_metrics": {...},
      "consent": {"opt_in": true, "consent_version": "v1"}}
 

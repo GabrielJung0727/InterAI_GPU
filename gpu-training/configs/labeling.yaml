@@ -1,0 +1,23 @@
+# Stage A: local LLM judge for answer rubric labels (scripts/label_answers.py).
+# Runs entirely on the local GPU; no external API is called.
+# Rubric V2 (0-4 scale, question type, per-dimension applicability) lives in
+# src/interview_gpu/answer/prompts.py.
+
+backend: transformers         # transformers | vllm (Linux / WSL2 only; falls back to transformers on Windows)
+model: Qwen/Qwen3-8B          # 24 GB+ VRAM: Qwen/Qwen3-14B
+quantization: auto            # transformers: auto | none | 8bit | 4bit (auto = 4bit when the weights do not fit)
+# vllm_model: Qwen/Qwen3-8B-AWQ   # vllm: serve this instead of `model` (pre-quantized build for 16 GB VRAM)
+vllm_gpu_memory_utilization: 0.90
+vllm_max_model_len: 4096
+input: data/processed/answer/answers.jsonl
+output: data/labeled/qwen3_answers.jsonl
+
+batch_size: auto              # integer, or auto (from free VRAM; halves itself on out-of-memory)
+max_new_tokens: 448
+temperature: 0.0              # 0.0-0.2; consistency re-runs and parse retries always sample
+consistency_runs: 1           # 2 = score twice and flag disagreement
+review_threshold: 2           # needs_review when a dimension differs by this many points (0-4 scale)
+max_retries: 2                # JSON parse retries before a sample goes to failed_samples
+max_answer_chars: 4000
+seed: 42                      # sample order; --limit 200 is a prefix of --limit 2000
+dry_run_limit: 200

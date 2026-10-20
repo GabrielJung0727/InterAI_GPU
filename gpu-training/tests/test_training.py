@@ -14,10 +14,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from conftest import base_config, load_torch, needs_parquet
+from conftest import base_config, load_torch
 
 torch = load_torch()
-pytestmark = needs_parquet
 
 from interview_gpu.answer.dataset import build_answer_data  # noqa: E402
 from interview_gpu.answer.model import AnswerEvaluatorModel  # noqa: E402
@@ -29,7 +28,7 @@ from interview_gpu.common.errors import (  # noqa: E402
     NaNLossError,
     UsageScopeError,
 )
-from interview_gpu.common.io import write_json  # noqa: E402
+from interview_gpu.common.io import read_table, write_json, write_table  # noqa: E402
 from interview_gpu.common.runner import run_evaluation, run_training  # noqa: E402
 from interview_gpu.schemas.answer import ANSWER_DIMENSIONS  # noqa: E402
 from interview_gpu.schemas.speech import SPEECH_FEATURE_NAMES  # noqa: E402
@@ -56,7 +55,7 @@ def make_speech_data(directory: Path, usage_scope: str = "research") -> Path:
     frame.loc[::5, "label_pause"] = np.nan  # partially labeled head
     frame["label_band"] = np.where(frame["label_pace"] > 5.5, "fast", "normal")
     directory.mkdir(parents=True)
-    frame.to_parquet(directory / "features.parquet", index=False)
+    write_table(directory / "features.csv", frame)
     write_json(directory / "manifest.json", {"dataset_name": "dummy", "usage_scope": usage_scope, "sample_rate": 16000})
     return directory
 
@@ -83,7 +82,7 @@ def test_speech_training_end_to_end(tmp_path: Path) -> None:
     assert sizes == {"train": 24, "val": 8, "test": 8}
 
     output_dir, checkpoint_dir = Path(summary["output_dir"]), Path(summary["checkpoint_dir"])
-    for name in ("train.log", "metrics.json", "history.csv", "config.yaml", "loss_curve.png", "predictions.parquet"):
+    for name in ("train.log", "metrics.json", "history.csv", "config.yaml", "loss_curve.png", "predictions.csv"):
         assert (output_dir / name).is_file(), name
     assert checkpoint_dir.name == "speech_v001"
     for name in ("model.pt", "config.yaml", "metrics.json", "metadata.json"):
@@ -91,7 +90,7 @@ def test_speech_training_end_to_end(tmp_path: Path) -> None:
     history = pd.read_csv(output_dir / "history.csv")
     assert {"train_loss", "val_loss", "val_mean_mae", "lr", "gpu_max_allocated_mb", "gpu_max_reserved_mb"} <= set(history)
     assert np.isfinite(history["train_loss"]).all()
-    predictions = pd.read_parquet(output_dir / "predictions.parquet")
+    predictions = read_table(output_dir / "predictions.csv")
     assert len(predictions) == 8 and {"sample_id", "pred_pace_score", "true_pace_score"} <= set(predictions)
 
     payload = load_checkpoint(checkpoint_dir)
@@ -106,7 +105,7 @@ def test_speech_training_end_to_end(tmp_path: Path) -> None:
     report = speech_evaluate.evaluate(checkpoint_dir, split="test", device_override="cpu")
     assert report["num_samples"] == 8
     assert report["metrics"]["mean"]["mae"] == pytest.approx(summary["metrics"]["test"]["mean"]["mae"], rel=1e-4)
-    assert (checkpoint_dir / "eval_test" / "predictions.parquet").is_file()
+    assert (checkpoint_dir / "eval_test" / "predictions.csv").is_file()
 
 
 def test_speech_analyzer_interface(tmp_path: Path) -> None:
@@ -184,7 +183,7 @@ def make_video_data(directory: Path) -> Path:
         rows.append({"sample_id": f"v{index}", "group_id": f"spk{index // 2}",
                      "sequence_path": f"sequences/v{index}.npy", "num_frames": frames,
                      "label_engagement": float(rng.uniform(1, 7))})
-    pd.DataFrame(rows).to_parquet(directory / "index.parquet", index=False)
+    write_table(directory / "index.csv", pd.DataFrame(rows))
     write_json(directory / "manifest.json", {"dataset_name": "dummy", "usage_scope": "research", "target_fps": 5.0})
     return directory
 
@@ -232,7 +231,7 @@ def make_answer_data(directory: Path) -> Path:
     directory.mkdir(parents=True)
     with (directory / "answers.jsonl").open("w", encoding="utf-8") as handle:
         for index in range(30):
-            scores = {name: float(rng.integers(0, 11)) for name in ANSWER_DIMENSIONS if rng.random() > 0.2}
+            scores = {name: float(rng.integers(0, 5)) for name in ANSWER_DIMENSIONS if rng.random() > 0.2}
             handle.write(json.dumps({
                 "sample_id": f"a{index}", "group_id": f"cand{index // 3}",
                 "question": "프로젝트 경험을 설명해주세요.", "answer": f"저는 서비스 {index}의 성능을 개선했습니다.",

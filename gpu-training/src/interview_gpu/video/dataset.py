@@ -2,7 +2,7 @@
 
 Layout written by ``prepare_video.py``::
 
-    index.parquet            sample_id, group_id, sequence_path, num_frames, metric_*, label_*
+    index.csv                sample_id, group_id, sequence_path, num_frames, metric_*, label_*
     sequences/<id>.npy       float32 [T, len(VIDEO_FEATURE_COLUMNS)]
     manifest.json
 """
@@ -12,19 +12,19 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
 from interview_gpu.common.config import Config, resolve_path
 from interview_gpu.common.errors import EmptyDatasetError
+from interview_gpu.common.io import read_table
 from interview_gpu.common.normalization import apply_normalizer, fit_normalizer
 from interview_gpu.common.runner import DataBundle, load_manifest
 from interview_gpu.common.tasks import Supervision, prepare_supervision
 from interview_gpu.datasets.processed import require_processed
 from interview_gpu.schemas.video import VIDEO_MODEL_FEATURES
 
-INDEX_FILE = "index.parquet"
+INDEX_FILE = "index.csv"
 PREPARE_COMMAND = "python scripts/prepare_video.py --input <raw dataset dir> --output data/processed/video"
 
 
@@ -84,7 +84,7 @@ def collate_sequences(batch: list[dict[str, Any]]) -> dict[str, Any]:
 def build_video_data(cfg: Config) -> DataBundle:
     """Load processed landmark sequences and build train/val/test datasets."""
     processed_dir = resolve_path(cfg.data.processed_dir)
-    frame = pd.read_parquet(require_processed(processed_dir / INDEX_FILE, PREPARE_COMMAND))
+    frame = read_table(require_processed(processed_dir / INDEX_FILE, PREPARE_COMMAND))
     supervision = prepare_supervision(frame, cfg.data, cfg.experiment.seed)
     splits = supervision.splits
 

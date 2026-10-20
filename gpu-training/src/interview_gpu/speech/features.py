@@ -18,6 +18,11 @@ from interview_gpu.schemas.speech import SPEECH_FEATURE_NAMES
 
 FRAME_LENGTH = 2048
 HOP_LENGTH = 512
+#: Silence detection uses a 25 ms window / 10 ms hop (at 16 kHz). The 2048-sample
+#: analysis window smears speech ~64 ms into each side of a pause, which made
+#: every pause read ~0.13 s short and dropped pauses just above ``min_pause_sec``.
+SILENCE_FRAME_LENGTH = 400
+SILENCE_HOP_LENGTH = 160
 
 _HANGUL = re.compile(r"[가-힣]")
 _LATIN_WORD = re.compile(r"[A-Za-z0-9]+")
@@ -123,7 +128,9 @@ def acoustic_features(wave: np.ndarray, config: SpeechFeatureConfig) -> dict[str
         features["response_latency"] = duration
         return features
 
-    intervals = librosa.effects.split(wave, top_db=config.top_db, frame_length=FRAME_LENGTH, hop_length=HOP_LENGTH)
+    intervals = librosa.effects.split(
+        wave, top_db=config.top_db, frame_length=SILENCE_FRAME_LENGTH, hop_length=SILENCE_HOP_LENGTH
+    )
     if len(intervals) == 0:
         features["response_latency"] = duration
         return features

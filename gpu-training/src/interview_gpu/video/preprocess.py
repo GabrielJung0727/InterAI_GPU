@@ -8,6 +8,7 @@ from typing import Any
 import pandas as pd
 
 from interview_gpu.common.errors import CorruptedMediaError, EmptyDatasetError
+from interview_gpu.common.io import write_table
 from interview_gpu.common.logging import get_logger
 from interview_gpu.datasets.base import BaseDatasetAdapter
 from interview_gpu.datasets.processed import coerce_label_columns, label_columns, safe_name, write_manifest
@@ -72,7 +73,7 @@ def prepare_video_dataset(
             f"No video could be processed from {adapter.root.as_posix()} (skipped: {dict(adapter.skipped)})."
         )
     frame = coerce_label_columns(pd.DataFrame(rows))
-    frame.to_parquet(output_dir / "index.parquet", index=False)
+    write_table(output_dir / "index.csv", frame)
     manifest = write_manifest(
         output_dir,
         adapter,

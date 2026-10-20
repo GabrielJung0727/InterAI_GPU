@@ -1,4 +1,4 @@
-"""Speech preprocessing: raw dataset -> ``features.parquet`` (+ embeddings).
+"""Speech preprocessing: raw dataset -> ``features.csv`` (+ embeddings).
 
 Handcrafted features run on CPU. Encoder embeddings (optional, Stage 2) are
 the only part that benefits from a GPU.
@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from interview_gpu.common.errors import CorruptedMediaError, EmptyDatasetError
+from interview_gpu.common.io import write_table
 from interview_gpu.common.logging import get_logger
 from interview_gpu.datasets.base import BaseDatasetAdapter
 from interview_gpu.datasets.processed import coerce_label_columns, label_columns, safe_name, write_manifest
@@ -82,7 +83,7 @@ def prepare_speech_dataset(
             f"(skipped: {dict(adapter.skipped)})."
         )
     frame = coerce_label_columns(pd.DataFrame(rows))
-    frame.to_parquet(output_dir / "features.parquet", index=False)
+    write_table(output_dir / "features.csv", frame)
     manifest = write_manifest(
         output_dir,
         adapter,
@@ -91,5 +92,5 @@ def prepare_speech_dataset(
         encoder_name=encoder_name,
         label_columns=sorted(c for c in frame.columns if c.startswith("label_")),
     )
-    logger.info("Wrote %d rows to %s", len(frame), output_dir / "features.parquet")
+    logger.info("Wrote %d rows to %s", len(frame), output_dir / "features.csv")
     return manifest

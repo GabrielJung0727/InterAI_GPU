@@ -8,7 +8,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from conftest import needs_parquet
 from interview_gpu.common.errors import CorruptedMediaError, MissingDependencyError
 from interview_gpu.schemas.video import VIDEO_FEATURE_COLUMNS, VIDEO_MODEL_FEATURES
 from interview_gpu.video import landmarks as lm
@@ -124,7 +123,7 @@ def test_summary_metrics_are_raw_measurements() -> None:
     assert summarize_table(build_feature_table(_video([]))) == {"frame_count": 0.0}
 
 
-@pytest.mark.parametrize("suffix", [".npy", pytest.param(".parquet", marks=needs_parquet)])
+@pytest.mark.parametrize("suffix", [".npy", ".csv"])
 def test_feature_table_roundtrip(tmp_path: Path, suffix: str) -> None:
     table = build_feature_table(_video([lm.FrameLandmarks(0.0, synthetic_face(), synthetic_pose())] * 3))
     path = tmp_path / f"sequence{suffix}"

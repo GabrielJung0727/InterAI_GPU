@@ -39,6 +39,7 @@ FIELD_PATHS: dict[str, tuple[str, ...]] = {
     "gender": ("dataSet.info.gender", "info.gender"),
     "age_range": ("dataSet.info.ageRange", "info.ageRange"),
     "audio_file": (
+        "rawDataInfo.answer.audioPath",
         "rawDataInfo.answer.fileName",
         "dataSet.rawDataInfo.answer.fileName",
         "rawDataInfo.fileName",

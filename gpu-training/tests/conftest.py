@@ -35,20 +35,6 @@ def load_torch() -> Any:
     return torch
 
 
-def _parquet_available() -> bool:
-    try:
-        import pyarrow  # noqa: F401
-    except (ImportError, OSError):
-        return False
-    return True
-
-
-#: Skip marker for tests that read/write parquet when pyarrow cannot be loaded.
-needs_parquet = pytest.mark.skipif(
-    not _parquet_available(), reason="pyarrow cannot be loaded in this environment"
-)
-
-
 def tone(seconds: float, frequency: float = 220.0, amplitude: float = 0.5) -> np.ndarray:
     """A sine tone standing in for voiced speech."""
     t = np.arange(int(seconds * SAMPLE_RATE)) / SAMPLE_RATE
@@ -138,7 +124,7 @@ def internal_dir(tmp_path: Path) -> Path:
     records: list[dict[str, Any]] = [
         {
             "sample_id": "no_consent", "candidate_id": "c0", "question": "Q?", "answer": "A.",
-            "scores": {"relevance": 5}, "consent": {"opt_in": False},
+            "scores": {"relevance": 2}, "consent": {"opt_in": False},
         }
     ]
     for i in range(1, 7):
@@ -146,7 +132,7 @@ def internal_dir(tmp_path: Path) -> Path:
             {
                 "sample_id": f"single_{i}", "candidate_id": f"c{i}", "question": "프로젝트 경험을 말해주세요.",
                 "answer": f"결제 시스템 지연을 {i * 10}% 줄였습니다.", "position": "Backend Engineer",
-                "interview_type": "technical", "scores": {"relevance": 5 + i * 0.5, "structure": 4 + i * 0.5},
+                "interview_type": "technical", "scores": {"relevance": 1 + i * 0.5, "structure": 0.5 + i * 0.5},
                 "consent": {"opt_in": True, "consent_version": "v1"},
             }
         )
@@ -155,7 +141,7 @@ def internal_dir(tmp_path: Path) -> Path:
                 "pair_id": f"pair_{i}", "candidate_id": f"c{i}", "question": "갈등 해결 경험은?",
                 "before_answer": "잘 해결했습니다.", "feedback": "구체적 사례를 추가하세요.",
                 "after_answer": f"스프린트 {i}에서 일정 충돌을 조율했습니다.",
-                "before_scores": {"relevance": 5, "specificity": 2}, "after_scores": {"relevance": 7, "specificity": 6},
+                "before_scores": {"relevance": 2, "specificity": 1}, "after_scores": {"relevance": 3, "specificity": 3},
                 "consent": {"opt_in": True},
             }
         )

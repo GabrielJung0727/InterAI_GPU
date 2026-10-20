@@ -28,7 +28,7 @@ class AnswerEvaluator:
 
         evaluator = AnswerEvaluator("checkpoints/answer/answer_v001")
         evaluator.predict(question="...", answer="...", job="Backend Engineer")
-        # {"scores": {"relevance": 8.2, "structure": 6.9, ...}, "model_version": "answer_v001"}
+        # {"scores": {"relevance": 3.2, "structure": 2.6, ...}, "model_version": "answer_v001"}
     """
 
     def __init__(self, checkpoint_dir: str | Path, device: str = "auto", tokenizer: Any | None = None) -> None:
